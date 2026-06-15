@@ -1,0 +1,26 @@
+
+#python cache 
+__pycache__/
+*.py[cod]
+*.pyo
+
+#virtual environments 
+.venv /
+venv /
+env /
+
+#ROS2 build outputs
+build /
+install /
+log /
+
+
+#OS files 
+.DS_Store
+Thumbs.db
+
+#Editor files
+
+.vscode/
+.idea/
+
