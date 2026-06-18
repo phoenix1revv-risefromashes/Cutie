@@ -4,7 +4,7 @@
 
 This document records the first hardware bring-up test for Cutie’s 7-inch face display.
 
-The goal was to verify that the NVIDIA Jetson Orin Nano can detect the HDMI touchscreen display through the DisplayPort-to-HDMI adapter and run it at the correct native resolution.
+The goal was to verify that the NVIDIA Jetson Orin Nano can detect the HDMI touchscreen display through the DisplayPort-to-HDMI adapter, run it at the correct native resolution, launch GUI applications onto it from SSH, and confirm touchscreen interaction.
 
 This matters because the display will later become Cutie’s expressive face interface.
 
@@ -43,9 +43,21 @@ The main debugging question was:
 Does Linux detect Cutie’s physical display correctly?
 ```
 
+A second debugging question was:
+
+```text
+Can GUI applications launched from SSH appear on Cutie’s physical display?
+```
+
+A third debugging question was:
+
+```text
+Does the touchscreen respond correctly as an input device?
+```
+
 ---
 
-## Display Session Debugging and Discovery Procedure
+## Display Session Discovery
 
 The first display test used:
 
@@ -112,7 +124,7 @@ DP-1 connected primary 1024x600+0+0 (normal left inverted right x axis y axis) 1
 
 ---
 
-## Result
+## Display Detection Result
 
 The display was successfully detected by Linux.
 
@@ -141,6 +153,44 @@ The line below confirms that `1024x600` is both the active and preferred display
 
 ---
 
+## GUI Window Launch Test
+
+After confirming that the display was detected by Linux, a basic GUI launch test was performed from SSH.
+
+The display session was set to:
+
+```bash
+export DISPLAY=:1
+```
+
+Two simple X11 test applications were launched:
+
+```bash
+xeyes
+```
+
+and:
+
+```bash
+xmessage -geometry 500x200+100+100 "CUTIE DISPLAY TEST"
+```
+
+Both applications successfully appeared on the 7-inch Cutie display.
+
+This confirms that SSH-based graphical applications can draw onto the physical Cutie face screen when the correct display session is selected.
+
+---
+
+## Touchscreen Verification
+
+The touchscreen was also tested and responded correctly on the Cutie display.
+
+This confirms that the display is functioning not only as a video output device, but also as an interactive touch input device.
+
+With this result, the Cutie display can now be treated as a working face and interaction surface for future GUI and ROS2-based face applications.
+
+---
+
 ## Debugging Notes
 
 The initial `DISPLAY=:0` test failed because the active X11 display socket was not `X0`.
@@ -159,6 +209,24 @@ export DISPLAY=:1
 
 This is useful when launching graphical tools or future face-display applications from SSH.
 
+The local physical session was also inspected using:
+
+```bash
+loginctl list-sessions
+```
+
+Observed session information included:
+
+```text
+SESSION  UID USER     SEAT   TTY
+4        1000 phoenix seat0  tty2
+6        1000 phoenix
+```
+
+This showed that session `4` was the physical Jetson display session because it was attached to `seat0` and `tty2`.
+
+The SSH session appeared separately without a physical seat or TTY.
+
 ---
 
 ## Current Status
@@ -171,14 +239,13 @@ Linux display detection
 Correct display output identified
 Correct native resolution confirmed
 Correct X11 display session identified
-Touchscreen input test working
+GUI window launch from SSH confirmed using xeyes and xmessage
+Touchscreen interaction confirmed
 ```
 
 Not completed yet:
 
 ```text
-
-GUI window launch confirmation from SSH
 ROS2 face display node
 Automatic startup of Cutie face application
 ```
@@ -187,7 +254,7 @@ Automatic startup of Cutie face application
 
 ## Next Steps
 
-1. Confirm whether graphical windows can be launched onto the display from SSH.
-2. Create the first Cutie face display application.
-4. Wrap the face display application into a ROS2 node.
-5. Configure automatic startup for the Cutie face application.
+1. Create the first standalone Cutie face display application.
+2. Verify the face application on the 7-inch display.
+3. Wrap the face display application into a ROS2 node.
+4. Configure automatic startup for the Cutie face application.
