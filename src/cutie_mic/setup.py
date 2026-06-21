@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "cutie_mic = cutie_mic.cutie_mic_node:main"
+            "cutie_microphone = cutie_mic.cutie_mic_node:main"
         ],
     },
 )
