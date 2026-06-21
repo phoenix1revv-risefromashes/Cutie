@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'cutie_ears'
+package_name = 'cutie_mic'
 
 setup(
     name=package_name,
@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            "cutie_mic = cutie_mic.cutie_mic_node:main"
         ],
     },
 )
