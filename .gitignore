@@ -28,4 +28,7 @@ Thumbs.db
 src/cutie_health/
 
 
+#models
+models/
+
 
