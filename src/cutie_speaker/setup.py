@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'speaker_node = cutie_speaker.cutie_speaker_node:main',
+            'cutie_speaker = cutie_speaker.cutie_speaker_node:main',
         ],
     },
 )

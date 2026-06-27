@@ -31,4 +31,5 @@ src/cutie_health/
 #models
 models/
 
-
+#tmp cutie recording files
+recordings/
