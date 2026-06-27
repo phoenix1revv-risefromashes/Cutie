@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'cutie_mic'
+package_name = 'cutie_speech'
 
 setup(
     name=package_name,
@@ -24,8 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "cutie_microphone = cutie_mic.cutie_mic_node:main",
-            "cutie_mic_recorder = cutie_mic.cutie_mic_recorder_node:main"
+            'cutie_stt = cutie_speech.stt_node:main'
         ],
     },
 )
