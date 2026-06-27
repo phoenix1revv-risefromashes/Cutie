@@ -1,0 +1,214 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install linting tools
+        run: pip install flake8
+
+      - name: Lint all ROS2 packages
+        run: |
+          flake8 \
+            src/cutie_brain/cutie_brain/ \
+            src/cutie_bringup/cutie_bringup/ \
+            src/cutie_face/cutie_face/ \
+            src/cutie_mic/cutie_mic/ \
+            src/cutie_speaker/cutie_speaker/ \
+            src/cutie_speech/cutie_speech/ \
+            src/cutie_vision/cutie_vision/ \
+            apps/cutie_face/ \
+            --max-line-length=160 \
+            --ignore=E101,E201,E203,E211,E222,E225,E226,E231,E251,E265,E301,E302,E303,E402,E501,F541,F811,W291,W292,W293,W391,W503,W504 \
+            --count --statistics
+
+  validate:
+    name: Validate ROS2 Workspace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: pip install setuptools lxml
+
+      - name: Check Python syntax — all nodes
+        run: |
+          python -m py_compile src/cutie_brain/cutie_brain/llm_node.py
+          python -m py_compile src/cutie_bringup/launch/cutie_voice_demo.launch.py
+          python -m py_compile src/cutie_face/cutie_face/face_node.py
+          python -m py_compile src/cutie_mic/cutie_mic/cutie_mic_node.py
+          python -m py_compile src/cutie_mic/cutie_mic/cutie_mic_recorder_node.py
+          python -m py_compile src/cutie_speaker/cutie_speaker/cutie_speaker_node.py
+          python -m py_compile src/cutie_speech/cutie_speech/stt_node.py
+          python -m py_compile src/cutie_vision/cutie_vision/cutie_camera_node.py
+          python -m py_compile apps/cutie_face/cutie_face.py
+          echo "All nodes passed syntax check"
+
+      - name: Validate package.xml files
+        run: |
+          python - <<'EOF'
+          import xml.etree.ElementTree as ET
+          import sys
+
+          packages = [
+              ("cutie_brain",   "src/cutie_brain/package.xml",   ["rclpy", "std_msgs"]),
+              ("cutie_bringup", "src/cutie_bringup/package.xml", ["launch_ros"]),
+              ("cutie_face",    "src/cutie_face/package.xml",    ["rclpy", "std_msgs"]),
+              ("cutie_mic",     "src/cutie_mic/package.xml",     ["rclpy", "std_msgs"]),
+              ("cutie_speaker", "src/cutie_speaker/package.xml", ["rclpy", "std_msgs"]),
+              ("cutie_speech",  "src/cutie_speech/package.xml",  ["rclpy", "std_msgs"]),
+              ("cutie_vision",  "src/cutie_vision/package.xml",  ["rclpy"]),
+          ]
+
+          for pkg_name, path, required_deps in packages:
+              tree = ET.parse(path)
+              root = tree.getroot()
+
+              name = root.findtext("name")
+              assert name == pkg_name, \
+                  f"{path}: expected name '{pkg_name}', got '{name}'"
+
+              build_type = root.find(".//export/build_type")
+              assert build_type is not None and build_type.text == "ament_python", \
+                  f"{path}: expected ament_python build type"
+
+              deps = {el.text for el in root.findall("depend")}
+              missing = [d for d in required_deps if d not in deps]
+              assert not missing, \
+                  f"{path}: missing dependencies {missing}"
+
+              print(f"  {pkg_name}: OK (deps: {sorted(deps)})")
+
+          print(f"\nAll {len(packages)} package.xml files valid")
+          EOF
+
+      - name: Validate setup.py entry points
+        run: |
+          python - <<'EOF'
+          import sys
+
+          entry_points = {
+              "src/cutie_brain/setup.py":   ["cutie_llm"],
+              "src/cutie_mic/setup.py":     ["cutie_microphone", "cutie_mic_recorder"],
+              "src/cutie_speaker/setup.py": ["cutie_speaker"],
+              "src/cutie_speech/setup.py":  ["cutie_stt"],
+              "src/cutie_vision/setup.py":  ["camera_node"],
+          }
+
+          for path, expected_eps in entry_points.items():
+              with open(path) as f:
+                  src = f.read()
+              for ep in expected_eps:
+                  assert ep in src, f"{path}: missing entry point '{ep}'"
+                  print(f"  {path}: '{ep}' found")
+
+          print(f"\nAll entry points verified")
+          EOF
+
+      - name: Verify full ROS2 workspace structure
+        run: |
+          python - <<'EOF'
+          import os, sys
+
+          required = [
+              # cutie_brain
+              "src/cutie_brain/package.xml",
+              "src/cutie_brain/setup.py",
+              "src/cutie_brain/setup.cfg",
+              "src/cutie_brain/cutie_brain/__init__.py",
+              "src/cutie_brain/cutie_brain/llm_node.py",
+              "src/cutie_brain/resource/cutie_brain",
+              # cutie_bringup
+              "src/cutie_bringup/package.xml",
+              "src/cutie_bringup/setup.py",
+              "src/cutie_bringup/launch/cutie_voice_demo.launch.py",
+              "src/cutie_bringup/resource/cutie_bringup",
+              # cutie_face
+              "src/cutie_face/package.xml",
+              "src/cutie_face/setup.py",
+              "src/cutie_face/cutie_face/__init__.py",
+              "src/cutie_face/cutie_face/face_node.py",
+              "src/cutie_face/resource/cutie_face",
+              # cutie_mic
+              "src/cutie_mic/package.xml",
+              "src/cutie_mic/setup.py",
+              "src/cutie_mic/cutie_mic/__init__.py",
+              "src/cutie_mic/cutie_mic/cutie_mic_node.py",
+              "src/cutie_mic/cutie_mic/cutie_mic_recorder_node.py",
+              "src/cutie_mic/resource/cutie_mic",
+              # cutie_speaker
+              "src/cutie_speaker/package.xml",
+              "src/cutie_speaker/setup.py",
+              "src/cutie_speaker/cutie_speaker/__init__.py",
+              "src/cutie_speaker/cutie_speaker/cutie_speaker_node.py",
+              "src/cutie_speaker/resource/cutie_speaker",
+              # cutie_speech
+              "src/cutie_speech/package.xml",
+              "src/cutie_speech/setup.py",
+              "src/cutie_speech/cutie_speech/__init__.py",
+              "src/cutie_speech/cutie_speech/stt_node.py",
+              "src/cutie_speech/resource/cutie_speech",
+              # cutie_vision
+              "src/cutie_vision/package.xml",
+              "src/cutie_vision/setup.py",
+              "src/cutie_vision/cutie_vision/__init__.py",
+              "src/cutie_vision/cutie_vision/cutie_camera_node.py",
+              "src/cutie_vision/resource/cutie_vision",
+              # app
+              "apps/cutie_face/cutie_face.py",
+          ]
+
+          missing = [p for p in required if not os.path.exists(p)]
+          if missing:
+              print("Missing paths:")
+              for p in missing:
+                  print(f"  {p}")
+              sys.exit(1)
+
+          print(f"ROS2 workspace structure OK — {len(required)} paths verified")
+          EOF
+
+      - name: Verify all nodes have main() entry point
+        run: |
+          python - <<'EOF'
+          import ast, sys
+
+          nodes = [
+              "src/cutie_brain/cutie_brain/llm_node.py",
+              "src/cutie_face/cutie_face/face_node.py",
+              "src/cutie_mic/cutie_mic/cutie_mic_node.py",
+              "src/cutie_mic/cutie_mic/cutie_mic_recorder_node.py",
+              "src/cutie_speaker/cutie_speaker/cutie_speaker_node.py",
+              "src/cutie_speech/cutie_speech/stt_node.py",
+              "src/cutie_vision/cutie_vision/cutie_camera_node.py",
+          ]
+
+          for path in nodes:
+              with open(path) as f:
+                  tree = ast.parse(f.read())
+              functions = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+              assert "main" in functions, \
+                  f"{path}: missing main() required for ROS2 console_scripts"
+              print(f"  {path}: main() OK")
+
+          print(f"\nAll {len(nodes)} nodes have required main() entry point")
+          EOF
