@@ -43,9 +43,11 @@ class CutieFaceApp(Node):
         )
         self.canvas.pack(fill="both", expand=True)
 
+        self.is_running = True
         self.current_expression = "idle"
         self.expression_until = 0.0
-        self.caption_text = "Tap: Next Expression | Double Tap: Quit | f Fullscreen | q/Esc Quit"
+        self.caption_text = "Hi, I am Cutie."
+        self.pending_single_tap = None
 
         self.expression_order = [
             "idle",
@@ -59,7 +61,6 @@ class CutieFaceApp(Node):
         ]
 
         self.expression_index = 0
-        self.pending_single_tap = None
 
         self.expression_drawers = {
             "idle": self.draw_idle_face,
@@ -118,77 +119,146 @@ class CutieFaceApp(Node):
         self.window.bind("<Escape>", self.close)
         self.window.bind("f", self.toggle_fullscreen)
 
-        self.window.bind("1", lambda event: self.set_expression("idle"))
-        self.window.bind("2", lambda event: self.set_expression("happy"))
-        self.window.bind("3", lambda event: self.set_expression("listening"))
-        self.window.bind("4", lambda event: self.set_expression("thinking"))
-        self.window.bind("5", lambda event: self.set_expression("speaking"))
-        self.window.bind("6", lambda event: self.set_expression("sleepy"))
-        self.window.bind("7", lambda event: self.set_expression("confused"))
-        self.window.bind("8", lambda event: self.set_expression("error"))
+        self.window.bind("1", lambda event: self.request_expression("idle", force=True))
+        self.window.bind("2", lambda event: self.request_expression("happy", force=True))
+        self.window.bind(
+            "3", lambda event: self.request_expression("listening", force=True)
+        )
+        self.window.bind(
+            "4", lambda event: self.request_expression("thinking", force=True)
+        )
+        self.window.bind(
+            "5", lambda event: self.request_expression("speaking", force=True)
+        )
+        self.window.bind(
+            "6", lambda event: self.request_expression("sleepy", force=True)
+        )
+        self.window.bind(
+            "7", lambda event: self.request_expression("confused", force=True)
+        )
+        self.window.bind("8", lambda event: self.request_expression("error", force=True))
 
         self.canvas.bind("<Button-1>", self.handle_screen_tap)
         self.canvas.bind("<Double-Button-1>", self.handle_screen_double_tap)
 
     def face_state_callback(self, msg):
         expression_name = msg.data.strip().lower()
-        self.set_expression(expression_name, seconds=3.0)
+
+        self.request_expression(
+            expression_name,
+            seconds=3.0,
+            caption="Manual face state.",
+            force=True,
+        )
 
     def audio_status_callback(self, msg):
         status = msg.data.strip().lower()
 
-        if status in ["sound_detected", "recording"]:
-            self.caption_text = "I am listening..."
-            self.set_expression("listening", seconds=2.0)
+        if status == "recording":
+            self.request_expression(
+                "listening",
+                seconds=2.0,
+                caption="I am listening...",
+            )
 
         elif status == "error":
-            self.caption_text = "Audio error."
-            self.set_expression("error", seconds=3.0)
+            self.request_expression(
+                "error",
+                seconds=3.0,
+                caption="Audio error.",
+            )
 
     def speech_status_callback(self, msg):
         status = msg.data.strip().lower()
 
         if status == "transcribing":
-            self.caption_text = "Thinking about what I heard..."
-            self.set_expression("thinking", seconds=4.0)
+            self.request_expression(
+                "thinking",
+                seconds=4.0,
+                caption="Thinking about what I heard...",
+            )
 
         elif status == "transcribed":
-            self.caption_text = "I heard you."
-            self.set_expression("happy", seconds=1.5)
+            self.request_expression(
+                "happy",
+                seconds=1.5,
+                caption="I heard you.",
+            )
 
         elif status == "empty":
-            self.caption_text = "Hmm, I did not catch that."
-            self.set_expression("confused", seconds=3.0)
+            self.request_expression(
+                "confused",
+                seconds=2.0,
+                caption="Hmm, I did not catch that.",
+            )
 
         elif status == "error":
-            self.caption_text = "Speech recognition error."
-            self.set_expression("error", seconds=3.0)
+            self.request_expression(
+                "error",
+                seconds=3.0,
+                caption="Speech recognition error.",
+            )
 
     def brain_status_callback(self, msg):
         status = msg.data.strip().lower()
 
         if status == "thinking":
-            self.caption_text = "Let me think..."
-            self.set_expression("thinking", seconds=5.0)
+            self.request_expression(
+                "thinking",
+                seconds=5.0,
+                caption="Let me think...",
+            )
 
         elif status == "responded":
-            self.caption_text = "Here is my answer."
-            self.set_expression("happy", seconds=1.5)
+            self.request_expression(
+                "happy",
+                seconds=1.5,
+                caption="Here is my answer.",
+            )
 
         elif status == "error":
-            self.caption_text = "Brain error."
-            self.set_expression("error", seconds=3.0)
+            self.request_expression(
+                "error",
+                seconds=3.0,
+                caption="Brain error.",
+            )
 
     def speaker_say_callback(self, msg):
         text = msg.data.strip()
 
-        if text:
-            self.caption_text = text
+        if not text:
+            return
 
         word_count = len(text.split())
         speaking_seconds = max(2.0, min(8.0, word_count * 0.35))
 
-        self.set_expression("speaking", seconds=speaking_seconds)
+        self.request_expression(
+            "speaking",
+            seconds=speaking_seconds,
+            caption=text,
+            force=True,
+        )
+
+    def request_expression(self, expression_name, seconds=2.0, caption=None, force=False):
+        if expression_name not in self.expression_drawers:
+            print(f"[CutieFaceApp] Unknown expression: {expression_name}")
+            return
+
+        if caption is not None:
+            self.caption_text = caption
+
+        now = time.time()
+
+        same_expression_is_active = (
+            expression_name == self.current_expression
+            and self.expression_until != 0.0
+            and now < self.expression_until
+        )
+
+        if same_expression_is_active and not force:
+            return
+
+        self.set_expression(expression_name, seconds=seconds)
 
     def handle_screen_tap(self, event=None):
         if self.pending_single_tap is not None:
@@ -241,6 +311,9 @@ class CutieFaceApp(Node):
         self.set_expression("idle")
 
     def ros_tick(self):
+        if not self.is_running:
+            return
+
         rclpy.spin_once(self, timeout_sec=0.0)
         self.return_to_idle_if_needed()
         self.window.after(50, self.ros_tick)
@@ -250,6 +323,7 @@ class CutieFaceApp(Node):
         self.window.attributes("-fullscreen", self.is_fullscreen)
 
     def close(self, event=None):
+        self.is_running = False
         self.window.destroy()
 
     def clear_screen(self):
@@ -674,8 +748,8 @@ class CutieFaceApp(Node):
         self.window.mainloop()
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
 
     app = CutieFaceApp()
 
